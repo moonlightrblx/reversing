@@ -1,2 +1,1 @@
-# reversing
-all the stuff ive reversed so far &lt;3
+# an organized repo of the reversing ive done on anticheats.
