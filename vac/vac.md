@@ -1,60 +1,60 @@
-I deliberately omitted **two critical modules** (you'll need to figure out which ones), as I want others to put in the effort to reverse-engineer them independently. Be warned: attempting to bypass VAC is far more complex than it seems. You’ll likely encounter multiple undocumented security measures that I won’t cover here.
+I deliberately excluded **two key modules** (you'll have to deduce which ones), as I want others to invest effort in reverse-engineering them. Be cautioned: bypassing VAC is much trickier than it appears. You'll likely run into several hidden security mechanisms that I won’t discuss here.
 
-It took **48 hours** to reverse-engineer and compile the details in this post (focusing solely on the modules). The information may not be entirely precise but is close to accurate. I only reversed what was necessary for my purposes, making educated guesses about less relevant sections.
+It took **48 hours** to reverse-engineer and document the details in this post (focused only on the modules). The information may not be fully accurate but is close. I only analyzed what was necessary for my goals, making informed assumptions about less relevant sections.
 
-The data was verified by analyzing module outputs, giving a solid overview of VAC module capabilities. This post only includes modules streamed to me—there may be others. Feel free to share additional findings in the comments.
-
----
-
-## 🧩 Module Breakdown
+The data was validated by examining module outputs, providing a clear picture of VAC module functions. This post covers only the modules I received—there could be others. Feel free to share additional discoveries in the comments.
 
 ---
 
-### **0x3E40 – Process Handle Scanner**
-- Lists processes using `EnumProcesses`.  
-- Employs `CreateToolhelp32Snapshot` and `Process32FirstW` to map process IDs to their parent processes.  
-- Uses `NtQuerySystemInformation(SystemHandleInformation)` to check for open handles across processes.  
+## 🧩 Module Overview
+
+---
+
+### **0x3E40 – Process Handle Monitor**
+- Scans processes using `EnumProcesses`.  
+- Utilizes `CreateToolhelp32Snapshot` and `Process32FirstW` to link process IDs to parent processes.  
+- Employs `NtQuerySystemInformation(SystemHandleInformation)` to detect open handles across processes.  
 - Collects:  
-  - Process start time.  
+  - Process creation timestamp.  
   - Process file path.  
-- Focuses on gathering data about active processes and their handles.
+- Focuses on gathering details about running processes and their handles.
 
 ---
 
-### **0x10E0 – Integrity Checker**
-Contains two subroutines.
+### **0x10E0 – Validation Module**
+Includes two routines.
 
-#### Subroutine 1
-1. Scans disks using:  
+#### Routine 1
+1. Examines disks using:  
    - `FindFirstVolumeW`, `GetVolumeInformationW`, `CreateFileW`.  
    - Searches for a specific **SerialNumber**.  
-2. Opens files by ID via `OpenFileById` and validates them with `WinVerifyTrust`.
+2. Opens files by ID with `OpenFileById` and verifies them using `WinVerifyTrust`.
 
-#### Subroutine 2
-- Collects process module and thread data:  
+#### Routine 2
+- Gathers process module and thread information:  
   - Uses `Module32FirstW` and `Thread32First`.  
-  - For modules: Extracts NT headers, file path, and name.  
+  - For modules: Extracts NT headers, path, and name.  
   - For threads: Retrieves start address via `NtQueryInformationThread(ThreadQuerySetWin32StartAddress)`.  
-- Dynamically inspects DLL memory pages (e.g., `client.dll`, `engine2.dll`, `gameoverlay64.dll`).
+- Dynamically reads DLL memory pages (e.g., `client.dll`, `engine2.dll`, `gameoverlay64.dll`).
 
 ---
 
-### **0x12B0 – CPU Profiler**
-- Queries CPUID using:  
-  - `0x40000000` (hypervisor details).  
-  - `0x80000000` (CPU specifics).
+### **0x12B0 – CPU Identifier**
+- Queries CPUID with:  
+  - `0x40000000` (hypervisor data).  
+  - `0x80000000` (CPU details).
 
 ---
 
-### **0x16E0 – Debug Detector**
-- Accesses `KSHARED_USER_DATA` for anti-debugging checks.  
-- Inspects `NtCurrentTeb()->ProcessEnvironmentBlock->BeingDebugged`.  
-- Applies XOR to the result.
+### **0x16E0 – Anti-Debug Mechanism**
+- Accesses `KSHARED_USER_DATA` for anti-debug checks.  
+- Examines `NtCurrentTeb()->ProcessEnvironmentBlock->BeingDebugged`.  
+- Applies XOR to the output.
 
 ---
 
-### **0x1050 – System Profiler**
-A comprehensive module gathering extensive system and process information.
+### **0x1050 – System Data Collector**
+A robust module capturing extensive system and process information.
 
 #### Functions Used:
 - `GetVersion`, `GetNativeSystemInfo`, `NtQuerySystemInformation` with:  
@@ -65,81 +65,81 @@ A comprehensive module gathering extensive system and process information.
   - `SystemBootEnvironmentInformation`  
   - `SystemRangeStartInformation`  
 - Retrieves process path (`GetProcessImageFileName`) and system directory (`GetSystemDirectoryW`).  
-- Collects disk data via:  
+- Collects disk info via:  
   - `GetFileInformationByHandleEx(FileIdBothDirectoryInfo)`  
   - `GetVolumeInformationByHandleW` (serial number).
 
 #### Additional Actions:
-- Accesses `ntdll` to locate syscall IDs for:  
+- Queries `ntdll` to identify syscall IDs for:  
   - `NtReadVirtualMemory`  
   - `NtQueryVirtualMemory`  
   - `NtOpenProcess`  
   - `NtQuerySystemInformation`  
-- Lists volumes using `FindFirstVolumeW` / `FindNextVolumeW`.  
-- Hashes volume details: name, serial number, filesystem type, and flags.  
-- Opens the game’s process handle and stores its ID.  
+- Enumerates volumes using `FindFirstVolumeW` / `FindNextVolumeW`.  
+- Hashes volume data: name, serial number, filesystem type, and flags.  
+- Opens the game process handle and stores its ID.  
 - Captures command-line arguments.  
-- Logs runtime using `KSHARED_USER_DATA`.
+- Tracks execution time via `KSHARED_USER_DATA`.
 
 ---
 
-### **0x1150 – Module Mapper**
-- Reads the PEB of a remote process to list loaded DLLs.  
+### **0x1150 – Section Inspector**
+- Reads a remote process’s PEB to list loaded DLLs.  
 - Captures section details:  
   - Name  
   - Raw size  
   - Characteristics  
   - Virtual address  
-- Likely hashes sections (in-memory or on-disk) and sends them to the server.
+- Likely hashes sections (in-memory or on-disk) and reports to the server.
 
 ---
 
-### **0x1340 – System Identity**
-Includes three subroutines.
+### **0x1340 – Identity Tracker**
+Contains three routines.
 
-#### Subroutine 1
-Gathers:  
+#### Routine 1
+Collects:  
   - MD5 hashes (possibly of executable sections).  
   - SID via `GetTokenInformation`.  
-  - Executable directory path.  
+  - Executable folder path.  
   - Command-line arguments.
 
-#### Subroutine 2
-- Traverses a path backward, collecting for each parent folder:  
+#### Routine 2
+- Traverses a path backward, gathering for each parent folder:  
   - File ID.  
   - Volume serial number.
 
-#### Subroutine 3
+#### Routine 3
 - Scans all files in a folder, collecting:  
   - Name  
   - Attributes  
   - ID  
   - Creation time  
-- Locates `steam.exe`, retrieves its PID.  
+- Identifies `steam.exe` and retrieves its PID.  
 - Uses `OpenProcessToken` → `GetUserProfileDirectoryW`.  
 - Hashes the parsed username.
 
 ---
 
-### **0x3330 – Boot Config Reader**
+### **0x3330 – Boot Config Extractor**
 - Queries registry:  
   - `BCD00000000\Objects{00000000-0000-0000-0000-000000000000}\Elements\00000000`  
-- Identifies entries containing **“Windows 10”** (typically `1200004`).  
+- Locates entries with **“Windows 10”** (typically `1200004`).  
 - Extracts bootloader details (e.g., `winload.efi` path, GUIDs).
 
 ---
 
-### **0xB290 – Embedded Code Loader**
+### **0xB290 – Embedded Code Executer**
 - Decrypts a byte array.  
-- Verifies it with CRC32.  
-- Executes the resulting code.
+- Validates it with CRC32.  
+- Runs the resulting code.
 
 ---
 
-### **0xE50 – Process Data Sender**
+### **0xE50 – Process Data Transmitter**
 Reference: [VAC – Process Information (and more)](https://www.unknowncheats.me/wiki/Va...ion_(and_more))
 
-- Maps a memory section and transmits it to the server.  
+- Maps a memory section and sends it to the server.  
 - Currently fails with error `0x1D2` (possibly disabled or outdated).
 
 #### Decompiled Code:
@@ -174,7 +174,7 @@ if (v22) {
 
 ---
 
-### **0xF7F0 – Driver & Service Enumerator**
+### **0xF7F0 – Driver & Service Scanner**
 
 #### Services
 - Uses:  
@@ -184,24 +184,24 @@ if (v22) {
   - Path name  
   - Display name  
   - Load order group  
-- Compares against hash `0xDC8AF399`.  
-- On failure, aborts and discards output.
+- Checks against hash `0xDC8AF399`.  
+- On error, terminates and discards output.
 
 #### Drivers
 - Uses:  
   - `NtOpenDirectoryObject`  
   - `NtQueryDirectoryObject`  
 - Gathers driver object names.  
-- Tracks the number of drivers and services processed.
+- Counts drivers and services processed.
 
 ---
 
-### **0xF80 – Plug-and-Play Device Scanner**
+### **0xF80 – Plug-and-Play Device Enumerator**
 
-Collects data on connected devices and their identifiers.
+Collects details on connected devices and their identifiers.
 
-#### Steps:
-1. **Retrieve Device List**  
+#### Process:
+1. **Fetch Device List**  
    ```cpp:disable-run
    HDEVINFO hDevInfo = SetupDiGetClassDevsA(
        NULL, NULL, NULL,
@@ -209,7 +209,7 @@ Collects data on connected devices and their identifiers.
    );
    ```
 
-2. **List Devices**  
+2. **Enumerate Devices**  
    ```cpp
    while (SetupDiEnumDeviceInfo(hDevInfo, index, &devInfo)) {
        // …
@@ -228,11 +228,12 @@ Collects data on connected devices and their identifiers.
      - Product ID (PID_xxxx)  
      - Class code (CC_xx)
 
-5. **Remove Duplicates**  
-   - Skips devices with matching `(VID, PID, CC)` tuples.
+5. **Deduplicate**  
+   - Ignores devices with identical `(VID, PID, CC)` tuples.
 
 6. **Store Data**  
    - Each entry is 8 bytes:  
      - `[ type_flag | class_code ]`  
      - `[ vendor_id (WORD) ]`  
      - `[ product_id (WORD) ]`
+```
