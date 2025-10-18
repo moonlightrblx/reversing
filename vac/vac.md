@@ -237,3 +237,8 @@ Collects details on connected devices and their identifiers.
      - `[ vendor_id (WORD) ]`  
      - `[ product_id (WORD) ]`
 ```
+
+
+# some cool things i randomly found while coding my injector
+- you can remove all stringrefs to dllmain and be ud for months (manual mapping with wpm)
+- replacing all winapi functions with nt equivilents =  goated method
