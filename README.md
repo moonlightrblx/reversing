@@ -7,4 +7,4 @@ Welcome to my personal collection of reverse engineering projects! This reposito
 
 all of the games folders are full of data i've reversed from those games
 
-vm.tracer.exe -> tells you if your device is commonly detected as a VM (may cause flags on games)
+`vm.tracer.exe` -> tells you if your device is commonly detected as a VM (may cause flags on games)
