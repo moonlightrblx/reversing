@@ -3,3 +3,8 @@ Welcome to my personal collection of reverse engineering projects! This reposito
 
 > [!IMPORTANT]
 > Educational Purpose Only: This repo is for research, learning, and security improvement. Do not use for malicious activities, such as cheating in online games.
+
+
+all of the games folders are full of data i've reversed from those games
+
+vm.tracer.exe -> tells you if your device is commonly detected as a VM (may cause flags on games)
