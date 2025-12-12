@@ -75,12 +75,14 @@ Same story with `DbgUiRemoteBreakin` inside ntdll.dll:
 `C3                    ret`
 #### Proof
 <img width="1919" height="1039" alt="image" src="https://github.com/user-attachments/assets/1bb9683d-a3ed-45a1-9b62-727b5f332b54" />
-```txt
+
+```cpp
 [*] DbgUiRemoteBreakin @ 0x00007FF843A1C9C0
 [BEFORE] ret patch: C3 4A 36 15 00
 [AFTER] ret patch: C3 4A 36 15 00
 [+] Patched DbgUiRemoteBreakin with RET
 ```
+
 ```cpp
 bool patch_dbgbreak() {
 // patching lib is closed src
