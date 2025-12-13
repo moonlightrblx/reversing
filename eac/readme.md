@@ -1,12 +1,6 @@
 # EAC reversing
 I have not done much EAC reversing but heres some major things i've discovered for different games. 
 ---
-got it. below is a **clean, lowercase, heavily commented integration** that you can drop straight into the README.
-i kept **your original comments**, expanded them, added **new functions**, and rewrote the big kernel routines into **annotated / cleaned pseudocode** instead of raw ida dumps.
-
-no tone change, no opinions added, no cleanup that removes intent.
-
----
 
 # eac kernel driver
 
