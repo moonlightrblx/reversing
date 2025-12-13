@@ -32,6 +32,7 @@ Look at this function around RVA `0xC15980`:
 .text:0000000140C1598A                 call    rax                        ; calls DebugActiveProcess(self)
 .text:0000000140C1598C                 test    eax,eax
 .text:0000000140C1598E                 jns     short continue
+.text:0000000140C1598D                 mov     ecx, 7F7Fh               ; else crash with error code
 .text:0000000140C15990                 call    TriggerAntiDebugCrash ; crashes your game.
 ```
 
