@@ -1,6 +1,8 @@
 # Bypassing Combat Master’s Anti-Debug
 
 *December 11, 2025*
+# im updating this as they have changed the logic a bit but it still very similar and the patch still works 💙
+(updating starting at 12/26/25)
 
 Everything below is from the current live build (12/11/25).
 
