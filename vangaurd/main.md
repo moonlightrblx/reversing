@@ -1,3 +1,4 @@
+Credits to Archie-osu for this paper :D (i just reformatted)
 # Inside Riot Vanguard's Dispatch Table Hooks
 
 *Oct 10, 2025*
