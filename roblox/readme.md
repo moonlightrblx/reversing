@@ -60,12 +60,15 @@ They check for a value known as a "leaf" / 0x40000002  is commonly used by:
 * Hypervisors
 * Emulators
 * VM vendors
+
 <img width="509" height="69" alt="image" src="https://github.com/user-attachments/assets/d3803e09-4369-43e1-8f62-00244505298c" />
 
 They also have some usermode hook checks using the GDI buffer. Why GDI buffer you ask? It's rarely accessed, stable memory and not expected to be touched.
+
 <img width="778" height="98" alt="image" src="https://github.com/user-attachments/assets/6b6a8471-8cc9-406c-bace-b451171c9446" />
 
 If any one of them fail NtTerminateProcess is called. For some odd reason this function is not dynamically imported like the other imported functions which I find very interesting.
+
 <img width="684" height="215" alt="image" src="https://github.com/user-attachments/assets/27c3efcb-5594-4da8-b4c8-ee6a33c1fe9b" />
 
 # Hypervisor protections
