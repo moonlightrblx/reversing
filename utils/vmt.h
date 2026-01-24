@@ -1,6 +1,6 @@
 #pragma once
 #include <Wndows.h>
-YES DADDY FUCK ME PLEASE DADDY YES AW YES ITS SO HOT WHEN U HAVE SEX WITH MY C++ INCLUDES
+
 template <typename hook_type>
 _declspec(noinline) hook_type vmt_hook(void* address, void* hook_function, int index, void** ret = nullptr) {
 	uintptr_t* original_vtable = *(uintptr_t**)address;
