@@ -1,5 +1,6 @@
 # Intro
 If you've ever opened roblox in IDA or Binary Ninja or whatever you may use to disassemble roblox you may have noticed the random INT3 instructions spread around the binary.
+
 <img width="648" height="423" alt="image" src="https://github.com/user-attachments/assets/c6fa9ee6-245c-4035-b113-119fb0857075" />
 
 Those are always located where the first branching instruction was. This essentially means the first branch of every function is replaced by the INT3s.
