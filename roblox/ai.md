@@ -1,115 +1,117 @@
-this version is the same (i didnt read it but it looks right) just reworded by deepseek.
+> *Reworded by Claude*
+
 # Introduction
 
-If you have ever opened the Roblox client in IDA or Binary Ninja, you may have noticed random INT3 instructions scattered throughout the binary.
+If you have ever loaded the Roblox client into a disassembler such as IDA or Binary Ninja, you may have noticed what appear to be random INT3 instructions scattered throughout the binary.
 
-<img width="648" height="423" alt="INT3 instructions in disassembler" src="https://github.com/user-attachments/assets/c6fa9ee6-245c-4035-b113-119fb0857075" />
+These INT3 breakpoints are consistently placed at the location where the first branching instruction of each function would ordinarily appear — in other words, the initial branch of every function has been swapped out for a breakpoint.
 
-Those INT3 instructions are always located where the first branching instruction of every function would normally be. Essentially, the initial branch of each function gets replaced by these breakpoints.
+Hyperion intercepts each of these INT3 hits and emulates the original branch instruction on the fly. If you want to restore the binary to its original state, you can walk through an internal array that stores both the RVA of each patched location and the original instruction bytes, then write them back.
 
-Hyperion emulates the real branch instruction whenever these INT3s are hit. If you want to restore them with the original instructions, you can iterate through an internal array. This array contains both the RVA of each entry and the original instruction data. You can then write the real instructions back.
+---
 
 # Initial Analysis
 
-When you first open the Hyperion protected binary in IDA, you will find that nearly all executable code resides in a .byfron section. Hyperion is not packed and does not use virtualization. So what is actually happening?
+Opening the Hyperion-protected binary in IDA reveals that virtually all executable code lives inside a `.byfron` section. Hyperion is neither packed nor virtualized — so what exactly is going on?
 
-Click on almost any function containing control flow, and IDA will likely fail to disassemble it properly. This is Hyperion's most common obfuscation technique. It is easily recognizable by seemingly "fake" instruction sequences that follow specific, repeating patterns throughout the binary. Mixed in is actual dead code that does not contribute to functionality but complicates analysis.
+Clicking into almost any function that contains control flow will cause IDA's disassembler to choke. This is Hyperion's most prevalent obfuscation strategy. It manifests as recognizable sequences of seemingly invalid instructions that repeat across the binary in predictable patterns, interspersed with genuine dead code that serves no functional purpose but significantly clutters analysis.
 
-<img width="767" height="362" alt="IDA failing to disassemble obfuscated function" src="https://github.com/user-attachments/assets/29b3690b-0f39-4a4b-8888-199ebece42fa" />
+---
 
 # Module Protection
 
-If you inspect the memory regions of imported modules, you will notice some are not mapped normally.
+Inspecting the memory regions of imported modules reveals that some of them are not mapped in the standard way.
 
-<img width="362" height="190" alt="Abnormal module mappings in memory" src="https://github.com/user-attachments/assets/bb69b971-434e-4028-8188-0c95ff76ebd8" />
+Under normal circumstances, loaded modules are shared across processes until a write triggers Copy-on-Write (CoW). Hyperion "hardens" select modules — most notably NTDLL — by remapping them using the `SEC_NOCHANGE` flag. This flag prevents any writes and makes CoW impossible. Any attempt to modify page protections on these modules will fail.
 
-Normally, loaded modules are shared across processes until a write triggers Copy on Write (CoW). Hyperion "protects" certain modules, like NTDLL, by remapping them with the SEC_NOCHANGE flag. This prevents writes and makes CoW impossible. Trying to change page protection on these modules will fail.
+Beyond remapping, Hyperion also installs hooks on a wide range of NTDLL functions (and others) to intercept sensitive API calls.
 
-Hyperion hooks numerous NTDLL functions (and others) to intercept critical API calls:
-
-<img width="207" height="559" alt="List of hooked NTDLL functions" src="https://github.com/user-attachments/assets/afb39a89-e16f-4de1-be9f-8717de01cdf8" />
+---
 
 # Launch and Initialization
 
-Hyperion gains control before Roblox's main code executes through several mechanisms:
+Hyperion establishes control before any of Roblox's own code has a chance to run, using several mechanisms:
 
-1.  **Pre execution via Windows loader:** Hyperion loads as an entry point DLL. It runs before Roblox's main code to set up protections, encrypt .text, install hooks, and more.
-2.  **Manual loading of critical imports:** Important libraries are loaded into custom memory sections with non standard mappings that prevent tampering.
-3.  **Instrumentation Callback (IC):** Hyperion registers an undocumented Windows feature that intercepts user mode to kernel mode transitions. This IC monitors threads, manages exceptions, and prevents unauthorized actions.
+1. **Pre-execution via the Windows loader:** Hyperion loads as an entry-point DLL, running ahead of Roblox's main code to configure protections, encrypt the `.text` section, install hooks, and perform other setup tasks.
+2. **Manual loading of critical imports:** Key libraries are loaded into custom memory regions using non-standard mappings specifically chosen to resist tampering.
+3. **Instrumentation Callback (IC):** Hyperion registers an undocumented Windows mechanism that intercepts every user-mode-to-kernel-mode transition. This callback is used to monitor threads, handle exceptions, and block unauthorized operations.
 
-## What is an IC?
+## What Is an Instrumentation Callback?
 
-An Instrumentation Callback acts as a middleman between user mode and kernel mode transitions. Hyperion uses it to control thread creation and monitor execution.
+An Instrumentation Callback sits between user mode and kernel mode, intercepting transitions in both directions. Hyperion uses it to exert control over thread creation and to monitor execution.
 
-One critical event the IC redirects is LdrInitializeThunk. This is the function Windows jumps to when creating a new thread. This gives Hyperion control before the thread's actual start address runs, allowing it to whitelist or terminate threads.
+One particularly important event it intercepts is `LdrInitializeThunk` — the function Windows jumps to when spinning up a new thread. By hijacking this, Hyperion gains execution before the thread's real start address runs, giving it the ability to whitelist or terminate threads on a case-by-case basis.
 
-Hyperion's hook on NtCreateThread(Ex) ensures internally created threads pass validation checks. External thread creation attempts are blocked.
+Hyperion's hook on `NtCreateThread(Ex)` ensures that any threads it creates internally pass its own validation. Any attempt to create threads from outside the process is blocked outright.
 
 ## TLS Callback
 
-Hyperion implements TlsCallback_0, which runs even before the DLL entry point. It contains substantial junk code and several anti debug/anti VM checks:
+Hyperion implements `TlsCallback_0`, which executes even before the DLL entry point. It contains a heavy volume of junk code alongside several anti-debug and anti-VM checks:
 
-They check for the CPUID leaf 0x40000002, commonly used by hypervisors and VMs:
-<img width="509" height="69" alt="CPUID check for hypervisor detection" src="https://github.com/user-attachments/assets/d3803e09-4369-43e1-8f62-00244505298c" />
+- It queries CPUID leaf `0x40000002`, a value commonly reported by hypervisors and virtual machine monitors.
+- It performs user-mode hook detection using the GDI buffer — an area of memory that is rarely accessed but tends to remain stable, making it a reliable baseline.
 
-They also perform user mode hook checks using the GDI buffer (rarely accessed, stable memory):
-<img width="778" height="98" alt="GDI buffer hook check" src="https://github.com/user-attachments/assets/6b6a8471-8cc9-406c-bace-b451171c9446" />
+If any of these checks fail, `NtTerminateProcess` is called. Notably, this function is statically imported rather than resolved dynamically.
 
-If any check fails, NtTerminateProcess is called (interestingly, this function is statically imported):
-<img width="684" height="215" alt="NtTerminateProcess call on failure" src="https://github.com/user-attachments/assets/27c3efcb-5594-4da8-b4c8-ee6a33c1fe9b" />
+---
 
 # Hypervisor Detection
 
-Hyperion employs several techniques to detect virtualization:
+Hyperion employs several techniques to detect whether it is running inside a virtual machine:
 
-*   Forces the CPU into 32 bit compatibility mode to execute instructions like CPUID that behave differently under virtualization
-*   Uses trap flags in specific registers to cause unconditional VMExits (many hypervisors mishandle this)
-*   Leverages #UD (Undefined Instruction) exceptions. Some hypervisors improperly emulate syscall/ret instructions that should normally raise these exceptions
+- It forces the CPU into 32-bit compatibility mode to execute instructions like `CPUID` that behave differently when virtualized.
+- It sets trap flags in specific registers to force unconditional VM exits, then checks whether the hypervisor handles them correctly (many do not).
+- It triggers `#UD` (Undefined Instruction) exceptions using `syscall`/`ret` sequences that should raise these exceptions in certain contexts — some hypervisors emulate these incorrectly, exposing their presence.
+
+---
 
 # Protection Mechanisms
 
-## Obfuscation Techniques
+## Obfuscation
 
-Hyperion uses multiple methods to break static analysis:
+Hyperion uses several methods to defeat static analysis:
 
-1.  **Fake instruction sequences:** Repetitive patterns that confuse disassemblers
-2.  **Dead code insertion:** Inflates stack frames and obscures real control flow
-3.  **Unconditional jumps to decrypted addresses:** Breaks linear code flow, forcing real time emulation to follow execution
+1. **Fake instruction sequences:** Repetitive, patterned byte sequences that mislead disassemblers into producing incorrect output.
+2. **Dead code insertion:** Inflates stack frames and buries real control flow under layers of non-functional instructions.
+3. **Unconditional jumps to runtime-decrypted addresses:** Shatters linear code flow and forces any analysis tool to emulate execution in real time to follow branches.
 
 ## Memory and Import Protection
 
-1.  **Dynamic import encryption:** Import addresses are encrypted and only decrypted when needed
-2.  **Memory monitoring:** Hooks on NtProtectVirtualMemory and NtAllocateVirtualMemory restrict executable memory to whitelisted regions
-3.  **Dual view memory for syscalls:** Uses separate RW and RX sections to hide code structure
-4.  **Hashed import resolution:** Uses Fnv1a 32 hashing for API lookups. Only validated keys are decrypted
+1. **Dynamic import encryption:** Import addresses remain encrypted at rest and are only decrypted immediately before use.
+2. **Memory monitoring:** Hooks on `NtProtectVirtualMemory` and `NtAllocateVirtualMemory` restrict executable memory to a set of pre-approved regions.
+3. **Dual-view memory for syscalls:** Separates readable/writable and executable views of the same memory to obscure code structure.
+4. **Hashed import resolution:** API lookups use FNV-1a 32-bit hashing. Only entries with validated hashes are decrypted.
 
-## Anti External Access (0AVX)
+## Anti-External Access (0AVX)
 
-External cheats often access the same Roblox instances (Players, Humanoid, etc.). Hyperion invalidates these instances and checks if they have been accessed between scheduler iterations.
+External cheats commonly work by reading from the same Roblox object instances (such as `Players` or `Humanoid`). Hyperion counters this by invalidating those instances and checking whether they have been accessed between scheduler iterations.
 
-It uses NtQueryVirtualMemory to see if pages supporting these instances remain in the process's working set. By calling VirtualUnlock, Hyperion removes pages from the working set. If they reappear before the next iteration, it indicates unauthorized access.
+It uses `NtQueryVirtualMemory` to determine whether the pages backing these instances are still present in the process's working set. By calling `VirtualUnlock`, Hyperion explicitly evicts those pages. If they show up again before the next iteration, that is treated as evidence of unauthorized access.
 
-According to Microsoft: "The working set of a process is the set of pages in the virtual address space that are currently resident in physical memory." Hyperion exploits this by extracting memory from the working set and checking for unauthorized restoration.
+As Microsoft defines it, a process's working set is the collection of virtual memory pages currently resident in physical memory. Hyperion exploits this by evicting pages and watching for unauthorized restoration.
+
+---
 
 # Dumping and Opaque Predicates
 
-I created a dumper specifically targeting the Hyperion module in memory. It resolves opaque predicates. These are branches that always take the same path but are disguised as conditional.
+A custom dumper targeting the in-memory Hyperion module was developed specifically to address opaque predicates — conditional branches that are disguised to look like real conditions but always resolve the same way.
 
-> ## Example of an opaque predicate
-> <img width="698" height="455" alt="Example of opaque predicate in code" src="https://github.com/user-attachments/assets/0625f1b3-32eb-4c7a-baae-bcbe78e89c59" />
+---
 
 # Bypassing Hyperion
 
-Since Hyperion operates entirely in user mode, many checks can be circumvented:
+Because Hyperion runs entirely in user mode, many of its checks are theoretically circumventable:
 
-1.  **Abusing the Instrumentation Callback:** The IC is central to many checks. Unmapping Hyperion, placing hooks, and remapping can bypass it.
-2.  **Page decryption:** Encrypted pages raise exceptions handled by the IC. Patching internal timers can leave pages unprotected indefinitely.
-3.  **Syscall spoofing:** Hook Hyperion's syscalls and return faked data.
+1. **Abusing the Instrumentation Callback:** Since the IC sits at the center of Hyperion's detection logic, unmapping Hyperion, inserting hooks, and remapping can neutralize it.
+2. **Page decryption abuse:** Encrypted pages raise exceptions that the IC normally handles. Patching the internal timers that govern re-encryption can leave pages permanently exposed.
+3. **Syscall spoofing:** Hook Hyperion's own syscall invocations and return falsified results.
 
-Fun fact: There are internal timers controlling how long pages stay unprotected and how often memory scans occur. Patching these alone can give you indefinitely unprotected pages and disable scans.
+Of note: internal timers control both how long pages remain unprotected and how frequently memory scans are scheduled. Patching these values alone is enough to obtain indefinitely decrypted pages and fully disabled scanning.
+
+---
 
 # Conclusion
 
-Hyperion represents a sophisticated anti tamper solution, especially considering it operates entirely in user mode. While it contains some oversights, reversing and bypassing it requires deep knowledge of Windows internals and significant reverse engineering experience.
+Hyperion is a sophisticated anti-tamper system — particularly impressive given that it operates entirely within user mode. While it has exploitable weaknesses, reversing and bypassing it demands deep familiarity with Windows internals and a substantial investment of reverse engineering effort.
 
-The system has successfully disabled previous major executors like Krnl, Synapse X, and Script Ware, demonstrating its effectiveness despite being user mode.
+Its effectiveness is demonstrated by the fact that it has successfully neutralized several previously prominent executors, including Krnl, Synapse X, and Script-Ware.
