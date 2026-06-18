@@ -60,14 +60,47 @@ pPEB->NtGlobalFlag &= ~0x70;
 `CheckRemoteDebuggerPresent` is a slightly higher level check that works on both the current process and remote processes. Under the hood it calls `NtQueryInformationProcess` with the `ProcessDebugPort` class. If a debugger is attached the kernel returns a non-zero debug port.
 
 ```cpp
+BOOL
+WINAPI
+CheckRemoteDebuggerPresent(IN HANDLE hProcess,
+                           OUT PBOOL pbDebuggerPresent)
+{
+    HANDLE DebugPort;
+    NTSTATUS Status;
+
+    /* Make sure we have an output and process*/
+    if (!(pbDebuggerPresent) || !(hProcess))
+    {
+        /* Fail */
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    /* Check if the process has a debug object/port */
+    Status = NtQueryInformationProcess(hProcess,
+                                       ProcessDebugPort,
+                                       &DebugPort,
+                                       sizeof(DebugPort),
+                                       NULL);
+    if (NT_SUCCESS(Status))
+    {
+        /* Return the current state */
+        *pbDebuggerPresent = DebugPort != NULL;
+        return TRUE;
+    }
+
+    /* Otherwise, fail */
+    BaseSetLastNTError(Status);
+    return;
+}
+// USAGE:
 BOOL bDebugged = FALSE;
 CheckRemoteDebuggerPresent(GetCurrentProcess(), &bDebugged);
 if (bDebugged) {
     // debugger detected
 }
 ```
-
-Because this goes through `ntdll` the cleanest fix is to hook `NtQueryInformationProcess` directly so you control what it returns:
+Knowing this goes through `ntdll` the best fix is to hook `NtQueryInformationProcess` directly. As hooking `NtQueryInformationProcess` allows the cleanest implementation and you only have to hook one function.
 
 ```cpp
 typedef NTSTATUS(NTAPI* pNtQueryInformationProcess)(
